@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Herd hook: SessionEnd
+# Herder hook: SessionEnd
 # Desregistra un agente cuando termina la sesión
 
 set -euo pipefail
 
-SOCKET="/tmp/herd.sock"
+SOCKET="/tmp/herder.sock"
 
 # Leer JSON de stdin
 INPUT=$(cat)

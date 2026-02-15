@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Herd hook: SessionStart
+# Herder hook: SessionStart
 # Registra un nuevo agente cuando inicia sesión
 
 set -euo pipefail
 
-SOCKET="/tmp/herd.sock"
+SOCKET="/tmp/herder.sock"
 
 # Leer JSON de stdin
 INPUT=$(cat)

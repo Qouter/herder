@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Herd hook: UserPromptSubmit
+# Herder hook: UserPromptSubmit
 # Marca el agente como activo (usuario ha respondido)
 
 set -euo pipefail
 
-SOCKET="/tmp/herd.sock"
+SOCKET="/tmp/herder.sock"
 
 # Leer JSON de stdin
 INPUT=$(cat)

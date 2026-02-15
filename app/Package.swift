@@ -2,20 +2,20 @@
 import PackageDescription
 
 let package = Package(
-    name: "Herd",
+    name: "Herder",
     platforms: [
         .macOS(.v13)
     ],
     products: [
         .executable(
-            name: "Herd",
-            targets: ["Herd"]
+            name: "Herder",
+            targets: ["Herder"]
         )
     ],
     targets: [
         .executableTarget(
-            name: "Herd",
-            path: "Sources/Herd"
+            name: "Herder",
+            path: "Sources/Herder"
         )
     ]
 )

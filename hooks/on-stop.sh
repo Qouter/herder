@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Herd hook: Stop
+# Herder hook: Stop
 # Marca el agente como idle y extrae el último mensaje del transcript
 
 set -euo pipefail
 
-SOCKET="/tmp/herd.sock"
+SOCKET="/tmp/herder.sock"
 
 # Leer JSON de stdin
 INPUT=$(cat)

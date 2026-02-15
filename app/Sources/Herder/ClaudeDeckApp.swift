@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @main
-struct HerdApp: App {
+struct HerderApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     var body: some Scene {
@@ -27,7 +27,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         menuBarController = MenuBarController(store: agentStore)
         
-        print("Herd started")
+        print("Herder started")
     }
     
     func applicationWillTerminate(_ notification: Notification) {
