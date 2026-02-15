@@ -41,7 +41,7 @@ struct AgentRowView: View {
             
             // Open button
             Button(action: {
-                TerminalLauncher.open(directory: session.cwd)
+                TerminalLauncher.open(session: session)
             }) {
                 Text("Open")
                     .font(.caption)

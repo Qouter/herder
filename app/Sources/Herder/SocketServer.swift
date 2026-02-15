@@ -106,7 +106,10 @@ class SocketServer {
             switch event {
             case "session_start":
                 if let cwd = json["cwd"] as? String {
-                    self.store.addSession(id: sessionId, cwd: cwd)
+                    let tty = json["tty"] as? String
+                    let terminalPid = json["terminal_pid"] as? String
+                    let terminalApp = json["terminal_app"] as? String
+                    self.store.addSession(id: sessionId, cwd: cwd, tty: tty, terminalPid: terminalPid, terminalApp: terminalApp)
                 }
             case "session_end":
                 self.store.removeSession(id: sessionId)

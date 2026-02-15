@@ -1,29 +1,32 @@
 import Foundation
 
-/// Representa una sesión de agente de Claude Code
 struct AgentSession: Identifiable, Equatable {
-    let id: String // session_id
+    let id: String
     let cwd: String
     var status: Status
     var lastMessage: String?
     let startTime: Date
     var lastActivity: Date
+    var tty: String?
+    var terminalPid: String?
+    var terminalApp: String?  // "warp", "iterm2", "terminal", "vscode", "cursor"
     
     enum Status: Equatable {
-        case working   // Agente está procesando
-        case idle      // Agente esperando input del usuario
+        case working
+        case idle
     }
     
-    init(id: String, cwd: String, status: Status = .working) {
+    init(id: String, cwd: String, status: Status = .working, tty: String? = nil, terminalPid: String? = nil, terminalApp: String? = nil) {
         self.id = id
         self.cwd = cwd
         self.status = status
-        self.lastMessage = nil
         self.startTime = Date()
         self.lastActivity = Date()
+        self.tty = tty
+        self.terminalPid = terminalPid
+        self.terminalApp = terminalApp
     }
     
-    /// Versión corta del directorio (sin home path)
     var shortCwd: String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         if cwd.hasPrefix(home) {
@@ -32,18 +35,9 @@ struct AgentSession: Identifiable, Equatable {
         return cwd
     }
     
-    /// Tiempo corriendo
-    var elapsed: TimeInterval {
-        Date().timeIntervalSince(startTime)
-    }
-    
-    /// String formateado del tiempo corriendo
     var elapsedString: String {
-        let minutes = Int(elapsed) / 60
+        let minutes = Int(Date().timeIntervalSince(startTime)) / 60
         let hours = minutes / 60
-        if hours > 0 {
-            return "\(hours)h \(minutes % 60)m"
-        }
-        return "\(minutes)m"
+        return hours > 0 ? "\(hours)h \(minutes % 60)m" : "\(minutes)m"
     }
 }

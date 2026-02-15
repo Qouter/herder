@@ -1,7 +1,6 @@
 import Foundation
 import Combine
 
-/// Global store for agent sessions
 class AgentStore: ObservableObject, @unchecked Sendable {
     @Published var sessions: [AgentSession] = []
     
@@ -10,23 +9,18 @@ class AgentStore: ObservableObject, @unchecked Sendable {
     
     init() {
         timeoutTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            DispatchQueue.main.async {
-                self?.cleanupStaleSessions()
-            }
+            DispatchQueue.main.async { self?.cleanupStaleSessions() }
         }
     }
     
-    deinit {
-        timeoutTimer?.invalidate()
-    }
+    deinit { timeoutTimer?.invalidate() }
     
     var totalCount: Int { sessions.count }
     var idleCount: Int { sessions.filter { $0.status == .idle }.count }
-    var workingCount: Int { sessions.filter { $0.status == .working }.count }
     
-    func addSession(id: String, cwd: String) {
+    func addSession(id: String, cwd: String, tty: String? = nil, terminalPid: String? = nil, terminalApp: String? = nil) {
         guard !sessions.contains(where: { $0.id == id }) else { return }
-        sessions.append(AgentSession(id: id, cwd: cwd, status: .working))
+        sessions.append(AgentSession(id: id, cwd: cwd, status: .working, tty: tty, terminalPid: terminalPid, terminalApp: terminalApp))
     }
     
     func removeSession(id: String) {
@@ -37,9 +31,7 @@ class AgentStore: ObservableObject, @unchecked Sendable {
         if let index = sessions.firstIndex(where: { $0.id == id }) {
             sessions[index].status = status
             sessions[index].lastActivity = Date()
-            if let message = lastMessage {
-                sessions[index].lastMessage = message
-            }
+            if let message = lastMessage { sessions[index].lastMessage = message }
         }
     }
     
