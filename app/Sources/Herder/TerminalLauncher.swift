@@ -4,98 +4,169 @@ import Foundation
 struct TerminalLauncher {
     
     static func open(session: AgentSession) {
-        // Try to activate the exact terminal window first
-        if let pid = session.terminalPid, let pidInt = Int32(pid) {
-            if let app = NSRunningApplication(processIdentifier: pidInt) {
-                app.activate()
-                return
+        let terminalApp = session.terminalApp ?? detectDefaultTerminal()
+        
+        switch terminalApp {
+        case "warp":
+            activateWarpTab(session: session)
+        case "iterm2":
+            activateITermTab(session: session)
+        case "terminal":
+            activateTerminalTab(session: session)
+        case "vscode", "cursor":
+            activateApp(bundleId: terminalApp == "vscode" ? "com.microsoft.VSCode" : "com.todesktop.230313mzl4w4u92")
+        default:
+            activateWarpTab(session: session)
+        }
+    }
+    
+    // MARK: - Warp
+    
+    private static func activateWarpTab(session: AgentSession) {
+        // Activate Warp first
+        activateApp(bundleId: "dev.warp.Warp-Stable")
+        
+        // Use System Events to find and activate the tab matching the cwd
+        // Warp tab titles typically contain the directory name
+        let dirName = (session.cwd as NSString).lastPathComponent
+        let shortCwd = session.shortCwd
+        
+        let script = """
+        tell application "System Events"
+            tell process "Warp"
+                set frontmost to true
+                delay 0.3
+                
+                -- Try to find the window/tab with matching title
+                set found to false
+                repeat with w in windows
+                    set winTitle to name of w
+                    if winTitle contains "\(dirName.escapedForAppleScript())" then
+                        perform action "AXRaise" of w
+                        set found to true
+                        exit repeat
+                    end if
+                end repeat
+                
+                if not found then
+                    -- Try menu bar: Window menu to find tab
+                    try
+                        click menu bar item "Window" of menu bar 1
+                        delay 0.2
+                        set menuItems to menu items of menu "Window" of menu bar item "Window" of menu bar 1
+                        repeat with mi in menuItems
+                            try
+                                set itemName to name of mi
+                                if itemName contains "\(dirName.escapedForAppleScript())" then
+                                    click mi
+                                    set found to true
+                                    exit repeat
+                                end if
+                            end try
+                        end repeat
+                        if not found then
+                            -- Close the menu if we didn't find anything
+                            key code 53
+                        end if
+                    end try
+                end if
+            end tell
+        end tell
+        """
+        
+        runAppleScript(script)
+    }
+    
+    // MARK: - iTerm2
+    
+    private static func activateITermTab(session: AgentSession) {
+        let dirName = (session.cwd as NSString).lastPathComponent
+        
+        let script = """
+        tell application "iTerm"
+            activate
+            repeat with w in windows
+                repeat with t in tabs of w
+                    repeat with s in sessions of t
+                        if name of s contains "\(dirName.escapedForAppleScript())" then
+                            select t
+                            return
+                        end if
+                    end repeat
+                end repeat
+            end repeat
+        end tell
+        """
+        
+        runAppleScript(script)
+    }
+    
+    // MARK: - Terminal.app
+    
+    private static func activateTerminalTab(session: AgentSession) {
+        let dirName = (session.cwd as NSString).lastPathComponent
+        
+        let script = """
+        tell application "Terminal"
+            activate
+            repeat with w in windows
+                repeat with t in tabs of w
+                    if custom title of t contains "\(dirName.escapedForAppleScript())" or history of t contains "\(dirName.escapedForAppleScript())" then
+                        set selected tab of w to t
+                        set index of w to 1
+                        return
+                    end if
+                end repeat
+            end repeat
+        end tell
+        """
+        
+        runAppleScript(script)
+    }
+    
+    // MARK: - Helpers
+    
+    private static func detectDefaultTerminal() -> String {
+        let terminals = [
+            ("dev.warp.Warp-Stable", "warp"),
+            ("com.googlecode.iterm2", "iterm2"),
+            ("com.apple.Terminal", "terminal")
+        ]
+        for (bundleId, name) in terminals {
+            if !NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).isEmpty {
+                return name
             }
         }
-        
-        // Fall back to activating by terminal app type
-        if let terminalApp = session.terminalApp {
-            switch terminalApp {
-            case "warp":
-                activateApp(bundleId: "dev.warp.Warp-Stable")
-            case "iterm2":
-                activateApp(bundleId: "com.googlecode.iterm2")
-            case "vscode":
-                activateApp(bundleId: "com.microsoft.VSCode")
-            case "cursor":
-                activateApp(bundleId: "com.todesktop.230313mzl4w4u92")
-            case "terminal":
-                activateApp(bundleId: "com.apple.Terminal")
-            default:
-                openNewTerminal(directory: session.cwd)
-            }
-            return
-        }
-        
-        // Last resort: open new terminal at directory
-        openNewTerminal(directory: session.cwd)
+        return "terminal"
     }
     
     private static func activateApp(bundleId: String) {
-        if let app = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first {
-            app.activate()
-        }
+        NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).first?.activate()
     }
     
-    private static func openNewTerminal(directory: String) {
-        // Try Warp first, then iTerm2, then Terminal.app
-        let terminals = [
-            ("dev.warp.Warp-Stable", "Warp"),
-            ("com.googlecode.iterm2", "iTerm"),
-            ("com.apple.Terminal", "Terminal")
-        ]
-        
-        for (bundleId, name) in terminals {
-            if NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) != nil {
-                let script: String
-                if name == "Warp" {
-                    script = """
-                    tell application "Warp"
-                        activate
-                    end tell
-                    delay 0.5
-                    tell application "System Events"
-                        keystroke "t" using command down
-                    end tell
-                    """
-                } else if name == "iTerm" {
-                    script = """
-                    tell application "iTerm"
-                        activate
-                        tell current window
-                            create tab with default profile
-                            tell current session
-                                write text "cd '\(directory.escapedForAppleScript())'"
-                            end tell
-                        end tell
-                    end tell
-                    """
-                } else {
-                    script = """
-                    tell application "Terminal"
-                        activate
-                        do script "cd '\(directory.escapedForAppleScript())'"
-                    end tell
-                    """
-                }
-                
-                var error: NSDictionary?
-                if let scriptObject = NSAppleScript(source: script) {
-                    scriptObject.executeAndReturnError(&error)
-                }
-                return
+    private static func runAppleScript(_ script: String) {
+        var error: NSDictionary?
+        if let scriptObject = NSAppleScript(source: script) {
+            scriptObject.executeAndReturnError(&error)
+            if let error = error {
+                print("AppleScript error: \(error)")
             }
         }
+    }
+}
+
+extension AgentSession {
+    var shortCwdForLauncher: String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        if cwd.hasPrefix(home) { return "~" + cwd.dropFirst(home.count) }
+        return cwd
     }
 }
 
 extension String {
     func escapedForAppleScript() -> String {
         replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
             .replacingOccurrences(of: "'", with: "\\'")
     }
 }
