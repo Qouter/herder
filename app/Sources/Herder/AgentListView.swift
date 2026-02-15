@@ -4,13 +4,19 @@ struct AgentListView: View {
     @ObservedObject var store: AgentStore
     let onClose: () -> Void
     
+    private var version: String {
+        let versionFile = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".herder/VERSION")
+        return (try? String(contentsOf: versionFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)) ?? "dev"
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 Text("Herder 🐑")
                     .font(.headline)
                 Spacer()
-                Text("v0.3.0")
+                Text(version)
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }.padding()

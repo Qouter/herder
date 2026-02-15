@@ -5,6 +5,7 @@ struct TerminalLauncher {
     
     static func open(session: AgentSession) {
         let terminalApp = session.terminalApp ?? detectDefaultTerminal()
+        print("Opening session: app=\(terminalApp), cwd=\(session.cwd), pid=\(session.terminalPid ?? "nil")")
         
         switch terminalApp {
         case "warp":
