@@ -21,7 +21,7 @@ jobs:
       - name: Build universal binary
         run: |
           cd app
-          swift build -c release --arch arm64 --arch x86_64
+          swift build -c release --arch arm64 --arch x86_64 -Xswiftc -strict-concurrency=minimal
       
       - name: Create .app bundle
         run: |
