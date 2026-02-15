@@ -5,15 +5,16 @@
 ## Install
 
 ```bash
-brew tap qouter/tap
-brew install herder
-herder open
+curl -fsSL https://raw.githubusercontent.com/Qouter/herder/main/install.sh | bash
 ```
 
-### Prerequisites
+That's it. One command installs the app, CLI, and Claude Code hooks.
 
-- macOS 13+
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
+### Or via Homebrew
+
+```bash
+brew tap qouter/tap && brew install herder
+```
 
 ## How it works
 
@@ -34,16 +35,25 @@ Uses [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) t
 
 ```bash
 herder open              # Launch the app
+herder update            # Update to latest version
 herder status            # Check configuration
 herder install-hooks     # Install/reinstall Claude Code hooks
 herder uninstall-hooks   # Remove hooks
+herder uninstall         # Remove everything
 ```
+
+## Update
+
+```bash
+herder update
+```
+
+That's it. Downloads the latest release, replaces the app, done.
 
 ## Uninstall
 
 ```bash
-herder uninstall-hooks
-brew uninstall herder
+herder uninstall
 ```
 
 ## License
