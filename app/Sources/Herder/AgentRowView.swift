@@ -14,20 +14,20 @@ struct AgentRowView: View {
             
             // Content
             VStack(alignment: .leading, spacing: 4) {
-                // CWD + branch
-                HStack(spacing: 6) {
-                    Text(session.shortCwd)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(.primary)
-                    if let branch = session.gitBranch {
-                        Text("⌥ \(branch)")
+                // CWD
+                Text(session.shortCwd)
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundColor(.primary)
+                
+                // Git branch
+                if let branch = session.gitBranch {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.caption2)
+                        Text(branch)
                             .font(.caption)
-                            .foregroundColor(.accentColor)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 1)
-                            .background(Color.accentColor.opacity(0.1))
-                            .cornerRadius(4)
                     }
+                    .foregroundColor(.accentColor)
                 }
                 
                 // Status text or last message
