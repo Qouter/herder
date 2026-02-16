@@ -36,6 +36,19 @@ struct AgentSession: Identifiable, Equatable {
         return cwd
     }
     
+    /// Reads the current git branch from .git/HEAD
+    var gitBranch: String? {
+        let headPath = "\(cwd)/.git/HEAD"
+        guard let content = try? String(contentsOfFile: headPath, encoding: .utf8)
+            .trimmingCharacters(in: .whitespacesAndNewlines) else { return nil }
+        // "ref: refs/heads/main" → "main"
+        if content.hasPrefix("ref: refs/heads/") {
+            return String(content.dropFirst("ref: refs/heads/".count))
+        }
+        // Detached HEAD — show short hash
+        return String(content.prefix(8))
+    }
+    
     var elapsedString: String {
         let minutes = Int(Date().timeIntervalSince(startTime)) / 60
         let hours = minutes / 60
