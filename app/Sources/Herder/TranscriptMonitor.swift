@@ -75,10 +75,11 @@ class TranscriptMonitor {
                 let stale = (staleSeconds[session.id] ?? 0) + pollInterval
                 staleSeconds[session.id] = stale
                 
-                // If transcript hasn't changed in 15s while "working", check if it's actually idle
+                // If transcript hasn't changed in 15s while "working", check last entry
                 if stale >= 15 {
                     if let lastContent = readLastLines(path: path, count: 5) {
-                        if isWaitingForInput(content: lastContent) {
+                        // Either matches a known pattern, or transcript is stale with last message from assistant
+                        if isWaitingForInput(content: lastContent) || (stale >= 20 && lastEntryIsAssistant(content: lastContent)) {
                             DispatchQueue.main.async {
                                 let message = self.extractLastMessage(from: lastContent)
                                 self.store.updateSessionStatus(id: session.id, status: .idle, lastMessage: message)
@@ -165,12 +166,34 @@ class TranscriptMonitor {
         return false
     }
     
+    /// Check if the last transcript entry is from the assistant (not a tool call)
+    private func lastEntryIsAssistant(content: [String]) -> Bool {
+        for line in content.reversed() {
+            guard let data = line.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let message = json["message"] as? [String: Any],
+                  let role = message["role"] as? String else { continue }
+            
+            if role == "assistant" {
+                // Make sure it's a text block, not a tool_use
+                if let contentArr = message["content"] as? [[String: Any]] {
+                    return contentArr.contains { $0["type"] as? String == "text" }
+                }
+                return false
+            }
+            return false
+        }
+        return false
+    }
+    
     /// Detect patterns that indicate Claude is asking the user something
     private func matchesWaitingPattern(_ text: String) -> Bool {
         let lowered = text.lowercased()
         let patterns = [
+            // English
             "would you like to proceed",
             "would you like me to",
+            "would you like to",
             "shall i ",
             "do you want me to",
             "do you want to",
@@ -181,11 +204,27 @@ class TranscriptMonitor {
             "ready to execute",
             "please confirm",
             "approve",
+            "which option",
+            "which approach",
+            "which one",
+            "what would you prefer",
+            "how would you like",
+            "choose from",
+            "select one",
+            "pick one",
+            // Spanish
             "¿quieres que",
             "¿te parece",
             "¿procedemos",
             "¿continúo",
             "¿sigo",
+            "¿cuál de",
+            "¿qué opción",
+            "¿qué prefieres",
+            "¿cómo prefieres",
+            "te gustaría",
+            "quieres que implemente",
+            "qué enfoque",
         ]
         return patterns.contains { lowered.contains($0) }
     }
