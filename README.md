@@ -1,19 +1,20 @@
 # Herder 🐑
 
-**A macOS menu bar app that shows how many Claude Code agents are running and which ones need your attention.**
+**A macOS menu bar app that monitors your Claude Code agents — see who's working and who needs you.**
 
 <p align="center">
   <code>🤖 3 | ⏳ 1</code>
 </p>
 
-Running multiple Claude Code agents across terminals? Herder sits in your menu bar and tells you at a glance:
+Running multiple Claude Code sessions across terminals? Herder sits in your menu bar and tells you at a glance:
 
-- **How many agents** are currently running
-- **Which ones are waiting** for your input
+- **How many agents** are currently active
+- **Which ones are waiting** for your input (including plan review prompts)
 - **What they last said** — so you know what needs attention
+- **Current git branch** per agent
 - **One click** to jump to any agent's terminal
 
-No network calls. No API keys. Everything stays on your machine.
+No network calls. No API keys. No dependencies. Everything stays on your machine.
 
 ## Install
 
@@ -21,31 +22,27 @@ No network calls. No API keys. Everything stays on your machine.
 curl -fsSL https://raw.githubusercontent.com/Qouter/herder/main/install.sh | bash
 ```
 
-One command. Installs the app, CLI, and Claude Code hooks. Done.
+One command. Installs the app, CLI, and Claude Code hooks. Works on any Mac — no Xcode, Homebrew, or extra tools required.
 
-<details>
-<summary>Or via Homebrew</summary>
-
-```bash
-brew tap qouter/tap
-brew install herder
-```
-</details>
+> **First launch:** If macOS blocks the app, the installer handles it automatically. If needed: `xattr -c ~/.herder/Herder.app`
 
 ## How it works
 
-Herder uses [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) to track agent lifecycle events. Four lightweight bash scripts fire on `SessionStart`, `SessionEnd`, `Stop`, and `UserPromptSubmit`, sending JSON messages to a local Unix socket. The menu bar app listens on that socket and updates in real time.
+Herder uses [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) to track agent lifecycle events. Four lightweight scripts fire on `SessionStart`, `SessionEnd`, `Stop`, and `UserPromptSubmit`, sending JSON messages to a local Unix domain socket.
+
+On top of hooks, a **transcript monitor** polls active session transcripts every 5 seconds to catch cases hooks can't — like plan review prompts, permission requests, or any time Claude is waiting for input without triggering a Stop event.
 
 ```
-Claude Code hooks  →  /tmp/herder.sock  →  Menu bar app
-(bash + jq)            (Unix socket)        (Swift + SwiftUI)
+Claude Code hooks → /tmp/herder.sock → Herder.app
+  (python3)          (Unix socket)      (SwiftUI)
+
+Transcript polling → idle detection → menu bar update
+  (every 5s)          (10s stale)
 ```
 
 ## Menu bar
 
-When no agents are running, you'll see a simple `🤖` icon.
-
-As agents start, the icon shows live counters:
+When no agents are running, you see a simple `🤖` icon. As agents start, live counters appear:
 
 | State | Menu bar |
 |-------|----------|
@@ -53,40 +50,44 @@ As agents start, the icon shows live counters:
 | 3 agents, all working | `🤖 3` |
 | 3 agents, 1 waiting | `🤖 3 \| ⏳ 1` |
 
-Click the icon to open the dropdown:
+Click to open the popover:
 
 ```
-┌─────────────────────────────────┐
-│  Herder 🐑              v0.4.0 │
-├─────────────────────────────────┤
-│                                 │
-│  🟢 ~/myproject                 │
-│     Working...          [Open]  │
-│                                 │
-│  🟡 ~/other-project             │
-│     "Refactored the auth..."    │
-│     Waiting for you     [Open]  │
-│                                 │
-├─────────────────────────────────┤
-│  2 active · 1 waiting    Quit   │
-└─────────────────────────────────┘
+┌──────────────────────────────────────┐
+│  Herder 🐑                   v0.6.4 │
+├──────────────────────────────────────┤
+│                                      │
+│  🟢 ~/Dev/diga_core                  │
+│     🔀 hey-836-recover-sales         │
+│     Working...               [Open]  │
+│     12m                              │
+│                                      │
+│  🟡 ~/Dev/frontend                   │
+│     🔀 feat/new-dashboard            │
+│     "¿Cuál de estas mejoras..."      │
+│     Waiting for you          [Open]  │
+│     45m                              │
+│                                      │
+├──────────────────────────────────────┤
+│  2 active · 1 waiting         Quit   │
+└──────────────────────────────────────┘
 ```
 
-- **🟢 Green** — agent is working
-- **🟡 Orange** — agent finished and is waiting for your input
-- **[Open]** — opens Terminal.app (or iTerm2 if installed) at the agent's directory
-- Last message from the agent is shown when idle
+- **🟢 Green** = agent is working
+- **🟡 Orange** = agent is waiting for your input
+- **🔀 branch** = current git branch
+- **[Open]** = jump to the agent's terminal (detects Warp, iTerm2, VS Code, Cursor, Terminal.app)
 
-> **Note:** Only sessions started after installing Herder will appear. Restart existing Claude Code sessions to track them.
+> **Note:** Only sessions started after Herder is running will appear. Existing sessions need to be restarted to be tracked.
 
 ## Commands
 
 ```bash
 herder open              # Launch the app
 herder update            # Update to latest version
-herder status            # Check configuration
+herder status            # Check installation & hooks
 herder install-hooks     # Install/reinstall Claude Code hooks
-herder uninstall-hooks   # Remove hooks
+herder uninstall-hooks   # Remove hooks from Claude Code
 herder uninstall         # Remove everything
 herder version           # Show installed version
 ```
@@ -97,26 +98,43 @@ herder version           # Show installed version
 herder update
 ```
 
-Downloads the latest release, replaces the app, done. No brew cache issues.
+Downloads the latest release from GitHub and replaces the app in-place. No cache issues, no brew update needed.
 
-## Hooks
+## Architecture
 
-Herder installs four async hooks in `~/.claude/settings.json`:
+```
+~/.herder/
+├── Herder.app           # SwiftUI menu bar app (universal binary)
+├── hooks/               # Claude Code hook scripts (python3)
+│   ├── on-session-start.sh
+│   ├── on-session-end.sh
+│   ├── on-stop.sh
+│   └── on-prompt.sh
+└── VERSION
 
-| Hook | Event | What it does |
-|------|-------|-------------|
-| `on-session-start.sh` | `SessionStart` | Registers a new agent |
-| `on-session-end.sh` | `SessionEnd` | Removes the agent |
-| `on-stop.sh` | `Stop` | Marks agent as idle, extracts last message from transcript |
-| `on-prompt.sh` | `UserPromptSubmit` | Marks agent as active again |
+/usr/local/bin/herder    # CLI wrapper (bash)
+/tmp/herder.sock         # Unix domain socket (runtime)
+```
 
-All hooks are `async: true` — they never block Claude Code.
+**Hooks** are registered in `~/.claude/settings.json` as async hooks — they never block Claude Code.
+
+**Transcript monitor** reads `.git/HEAD` for branch info and watches `~/.claude/projects/` for transcript changes to detect idle states that hooks miss.
+
+**Zero dependencies** — hooks use only Python 3 (ships with macOS). The app is a pre-built universal binary (arm64 + x86_64).
+
+## How idle detection works
+
+Herder uses two complementary strategies:
+
+1. **Hook-based:** The `Stop` hook fires when Claude finishes a turn and returns to the prompt. This catches most cases.
+
+2. **Transcript polling:** Every 5 seconds, Herder checks active transcripts. If the last entry is from the assistant and the file hasn't changed in 10+ seconds, the agent is marked as idle. This catches plan review prompts, permission dialogs, and multi-choice questions that don't trigger the Stop hook.
 
 ## Prerequisites
 
-- macOS 13+
+- macOS 13+ (Ventura or later)
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code)
-- `jq` and `socat` (`brew install jq socat`)
+- Python 3 (included with macOS)
 
 ## Uninstall
 
@@ -124,17 +142,28 @@ All hooks are `async: true` — they never block Claude Code.
 herder uninstall
 ```
 
-Removes the app, CLI, and hooks. Clean.
+Removes the app, CLI, and hooks cleanly.
 
 ## Roadmap
 
-- [ ] Detect existing running sessions on launch
-- [ ] Notification sound when an agent goes idle
+- [ ] Detect existing sessions on app launch
+- [ ] Notification sound / system notification when an agent goes idle
 - [ ] Keyboard shortcut to open the popover
-- [ ] Jump to exact terminal tab (iTerm2, Warp, VS Code integrated terminal)
+- [ ] Navigate to exact Warp tab (blocked by Warp's lack of Accessibility API)
 - [ ] Show project name (from package.json, Cargo.toml, etc.)
 - [ ] Launch at Login toggle
-- [ ] Homebrew cask for drag-and-drop install
+
+## Contributing
+
+PRs welcome. The app builds with Swift 5.9+ / Xcode 15+. GitHub Actions handles release builds automatically on version tags.
+
+```bash
+# Local build
+cd app && swift build
+
+# Tag a release
+git tag v0.x.x && git push origin main --tags
+```
 
 ## License
 
